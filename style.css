@@ -767,10 +767,15 @@ tbody tr:last-child { border-bottom: none; }
 }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* Smooth marker icon transitions for realistic movement (used by both
-   the main live map and the track modal) */
+/* Realistic moving-cart marker styling.
+   Position updates now happen on every animation frame from JS itself
+   (see index.js simStep), so we deliberately do NOT add a CSS transition
+   on the marker's transform/position here — a long CSS transition would
+   fight against the per-frame JS updates and actually look laggy or
+   rubber-banded. The car icon inside stays upright at all times (no
+   rotation), per request — only its position glides smoothly. */
 .leaflet-marker-icon {
-  transition: transform 0.95s linear;
+  will-change: transform;
 }
 
 /* RESPONSIVE */
