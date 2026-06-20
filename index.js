@@ -1,3 +1,4 @@
+// ══════════════════════════════════════════════════
 //  DATA — localStorage helpers
 // ══════════════════════════════════════════════════
 function loadUsers() {
@@ -135,23 +136,11 @@ function segDistanceMeters(a, b) {
   return Math.sqrt(dLat * dLat + dLng * dLng);
 }
 
-function bearingDeg(a, b) {
-  const y = Math.sin(((b.lng - a.lng) * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180);
-  const x =
-    Math.cos((a.lat * Math.PI) / 180) * Math.sin((b.lat * Math.PI) / 180) -
-    Math.sin((a.lat * Math.PI) / 180) *
-      Math.cos((b.lat * Math.PI) / 180) *
-      Math.cos(((b.lng - a.lng) * Math.PI) / 180);
-  const brng = (Math.atan2(y, x) * 180) / Math.PI;
-  return (brng + 360) % 360;
-}
-
 CARTS.forEach((c) => {
   c.path = buildCartPath(c);
   c.segIndex = 0;                       // which segment of the path we're travelling on
   c.segProgress = Math.random();        // 0..1 progress along that segment
   c.direction = 1;                      // 1 = forward along path, -1 = backward
-  c.heading = 0;                        // current facing angle (deg), for marker rotation
   c.baseSpeed = 1.6 + Math.random() * 0.8; // each cart has a slightly different "personality" speed (m/s, ~6-8 km/h golf-cart pace)
   c.curSpeed = c.baseSpeed;             // current eased speed (accelerates/decelerates)
 });
@@ -223,12 +212,12 @@ function renderMarkers() {
   });
 }
 
-// Cart marker HTML — the inner emoji rotates to face the direction of
-// travel (heading), which is what sells the "realistic vehicle" look
-// rather than a flat icon sliding sideways.
+// Cart marker HTML — icon stays upright (no rotation) while still moving
+// smoothly along the path; only position glides, the car emoji itself
+// always faces straight up.
 function cartIconHtml(cart, col) {
   return `<div style="background:white;border:3px solid ${col};border-radius:50%;width:44px;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer">
-    <span style="font-size:19px;display:inline-block;transition:transform .25s ease-out;transform:rotate(${cart.heading}deg)">🚗</span>
+    <span style="font-size:19px;display:inline-block">🚗</span>
     <span style="font-size:9px;color:${col};font-weight:700">${cart.passengers}/${cart.capacity}</span>
   </div>`;
 }
@@ -248,18 +237,13 @@ function simStep(ts) {
     moveCartRealistically(c, dt);
   });
 
-  // Push new positions + rotation straight into the existing Leaflet
-  // markers every frame — combined with the marker's own short CSS
-  // transition this produces a continuous, fluid glide along the road.
+  // Push new positions straight into the existing Leaflet markers every
+  // single frame — this produces a continuous, fluid glide along the
+  // road. The car icon itself stays upright; only its position moves.
   active.forEach((cart, i) => {
     const marker = cartMarkers[i];
     if (!marker) return;
     marker.setLatLng([cart.lat, cart.lng]);
-    const icon = marker.getElement();
-    if (icon) {
-      const span = icon.querySelector("span");
-      if (span) span.style.transform = `rotate(${cart.heading}deg)`;
-    }
   });
 
   simAnimHandle = requestAnimationFrame(simStep);
@@ -315,15 +299,6 @@ function moveCartRealistically(c, dt) {
   const b2 = c.path[c.segIndex + 1] || a2;
   c.lat = a2.lat + (b2.lat - a2.lat) * c.segProgress;
   c.lng = a2.lng + (b2.lng - a2.lng) * c.segProgress;
-
-  // Update heading to face direction of travel (smoothly, via the
-  // bearing between current path points) — flips correctly when the
-  // cart reverses direction at either end of its route.
-  const headTarget = c.direction === 1 ? bearingDeg(a2, b2) : bearingDeg(b2, a2);
-  // shortest-angle smoothing so the icon doesn't spin the long way around
-  let diff = ((headTarget - c.heading + 540) % 360) - 180;
-  c.heading += diff * Math.min(1, dt * 4);
-  c.heading = (c.heading + 360) % 360;
 }
 
 // ══════════════════════════════════════════════════
@@ -441,19 +416,14 @@ function openTrackModal(cartId) {
       L.circleMarker(coord, { radius: 6, color: "#28a745", fillColor: "#28a745", fillOpacity: 0.8 }).addTo(trackMap);
     });
 
-    // Smooth per-frame follow: pushes the marker's position & rotation
-    // every animation frame (mirrors the main map's simStep) so the
-    // tracked cart glides continuously instead of stepping once a second.
+    // Smooth per-frame follow: pushes the marker's position every
+    // animation frame (mirrors the main map's simStep) so the tracked
+    // cart glides continuously instead of stepping once a second.
     let lastPan = 0;
     function trackFrame() {
       const updated = CARTS.find((c) => c.id === cartId);
       if (!updated || !trackMarker || !trackMap) return;
       trackMarker.setLatLng([updated.lat, updated.lng]);
-      const icon = trackMarker.getElement();
-      if (icon) {
-        const span = icon.querySelector("span");
-        if (span) span.style.transform = `rotate(${updated.heading}deg)`;
-      }
       // Gently re-center the view every ~1.2s rather than every frame,
       // so the camera follow itself feels like a smooth periodic pan
       // instead of constantly fighting the user's own map drags.
@@ -484,7 +454,7 @@ function openTrackModal(cartId) {
 
 function trackCartIconHtml(cart, col) {
   return `<div style="background:white;border:3px solid ${col};border-radius:50%;width:50px;height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.3)">
-    <span style="font-size:22px;display:inline-block;transition:transform .25s ease-out;transform:rotate(${cart.heading}deg)">🚗</span>
+    <span style="font-size:22px;display:inline-block">🚗</span>
     <span style="font-size:9px;color:${col};font-weight:700">${cart.passengers}/${cart.capacity}</span>
   </div>`;
 }
